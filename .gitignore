@@ -1,0 +1,4 @@
+**/.pbi/localSettings.json
+**/.pbi/cache.abf
+reports/*.pdf
+__pycache__/

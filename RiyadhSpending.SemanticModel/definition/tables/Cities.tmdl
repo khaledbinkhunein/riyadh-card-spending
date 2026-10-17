@@ -1,0 +1,54 @@
+table Cities
+	lineageTag: 4b5d7387-f8fc-4b55-a598-095035832975
+
+	column City
+		dataType: string
+		lineageTag: c6e14d00-f2f7-4b60-89b7-d63a6a49d51a
+		summarizeBy: none
+		sourceColumn: City
+
+		annotation SummarizationSetBy = Automatic
+
+	column WeekEnding
+		dataType: dateTime
+		formatString: Long Date
+		isHidden
+		lineageTag: 264ebde3-10f6-4a0e-b772-bf88b6103864
+		summarizeBy: none
+		sourceColumn: WeekEnding
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation UnderlyingDateTimeDataType = Date
+
+	column Transactions
+		dataType: int64
+		formatString: #,0
+		isHidden
+		lineageTag: 474857cf-f869-41dc-9707-4e92e4315b6f
+		summarizeBy: sum
+		sourceColumn: Transactions
+
+		annotation SummarizationSetBy = Automatic
+
+	column ValueSAR
+		dataType: int64
+		formatString: #,0
+		isHidden
+		lineageTag: 3ef1ec3f-f5b7-41e7-8fba-244d8de2b0cb
+		summarizeBy: sum
+		sourceColumn: ValueSAR
+
+		annotation SummarizationSetBy = Automatic
+
+	partition Cities = m
+		mode: import
+		source =
+				let
+				    Source = Csv.Document(File.Contents(DataFolder & "cities.csv"), [Delimiter = ",", Columns = 4, Encoding = 65001, QuoteStyle = QuoteStyle.Csv]),
+				    Promoted = Table.PromoteHeaders(Source, [PromoteAllScalars = true]),
+				    Typed = Table.TransformColumnTypes(Promoted, {{"City", type text}, {"WeekEnding", type date}, {"Transactions", Int64.Type}, {"ValueSAR", Int64.Type}}, "en-US")
+				in
+				    Typed
+
+	annotation PBI_ResultType = Table

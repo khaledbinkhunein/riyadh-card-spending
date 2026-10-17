@@ -1,0 +1,7 @@
+relationship 37c2bd02-2d61-4a52-bef2-c12bc156a87f
+	fromColumn: Cities.WeekEnding
+	toColumn: Date.Date
+
+relationship d5c82485-672c-4996-8d22-9b75fe4db2a3
+	fromColumn: Activities.WeekEnding
+	toColumn: Date.Date

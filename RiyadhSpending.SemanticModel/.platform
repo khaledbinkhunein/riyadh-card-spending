@@ -1,0 +1,11 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/gitIntegration/platformProperties/2.0.0/schema.json",
+  "metadata": {
+    "type": "SemanticModel",
+    "displayName": "RiyadhSpending"
+  },
+  "config": {
+    "version": "2.0",
+    "logicalId": "c66fcb82-994a-4b89-b932-5f90b6f8a586"
+  }
+}

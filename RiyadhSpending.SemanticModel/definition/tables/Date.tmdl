@@ -1,0 +1,83 @@
+table Date
+	lineageTag: 9c1ef62f-18d5-47dc-aaa5-886947bdf7f2
+
+	column Date
+		dataType: dateTime
+		formatString: d mmm yyyy
+		lineageTag: 92d732e2-29ea-4fc4-835f-573b71d753f4
+		summarizeBy: none
+		sourceColumn: Date
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation UnderlyingDateTimeDataType = Date
+
+	column Month
+		dataType: string
+		lineageTag: 1bb4f4b3-dee0-4201-b7ac-bcf5d033858a
+		summarizeBy: none
+		sourceColumn: Month
+		sortByColumn: 'Month Sort'
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Month Sort'
+		dataType: int64
+		formatString: 0
+		isHidden
+		lineageTag: eb88b7d1-bf49-4e6a-9201-536126dd21be
+		summarizeBy: none
+		sourceColumn: Month Sort
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Week Label'
+		dataType: string
+		lineageTag: 3f6679c7-d53b-42b0-9f9b-64b8f71f187f
+		summarizeBy: none
+		sourceColumn: Week Label
+		sortByColumn: Date
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Week Type'
+		dataType: string
+		lineageTag: 1e89e0d3-7368-4314-a8e3-4d3a5d860588
+		summarizeBy: none
+		sourceColumn: Week Type
+
+		annotation SummarizationSetBy = Automatic
+
+	column Season
+		dataType: string
+		lineageTag: e1fbc04b-a6d2-46a7-8040-0ce574c82f53
+		summarizeBy: none
+		sourceColumn: Season
+
+		annotation SummarizationSetBy = Automatic
+
+	partition Date = m
+		mode: import
+		source =
+				let
+				    Source = Csv.Document(File.Contents(DataFolder & "cities.csv"), [Delimiter = ",", Columns = 4, Encoding = 65001, QuoteStyle = QuoteStyle.Csv]),
+				    Promoted = Table.PromoteHeaders(Source, [PromoteAllScalars = true]),
+				    Typed = Table.TransformColumnTypes(Promoted, {{"WeekEnding", type date}}, "en-US"),
+				    Weeks = List.Sort(List.Distinct(Typed[WeekEnding])),
+				    Base = Table.FromList(Weeks, Splitter.SplitByNothing(), type table [Date = date]),
+				    Month = Table.AddColumn(Base, "Month", each Date.ToText([Date], "MMM yyyy", "en-US"), type text),
+				    MonthSort = Table.AddColumn(Month, "Month Sort", each Date.Year([Date]) * 100 + Date.Month([Date]), Int64.Type),
+				    WeekLabel = Table.AddColumn(MonthSort, "Week Label", each "w/e " & Date.ToText([Date], "d MMM yy", "en-US"), type text),
+				    // A Sun-Sat week contains the 1st of the month when it ends on day 1-7
+				    WeekType = Table.AddColumn(WeekLabel, "Week Type", each if Date.Day([Date]) <= 7 then "Month-start week" else "Other week", type text),
+				    // Week-ending Saturdays; Islamic holidays per the Umm al-Qura calendar (Ramadan 1447 began 18 Feb 2026)
+				    Season = Table.AddColumn(WeekType, "Season", each
+				        if [Date] >= #date(2026, 2, 21) and [Date] <= #date(2026, 3, 14) then "Ramadan"
+				        else if [Date] = #date(2026, 3, 21) then "Eid al-Fitr"
+				        else if [Date] = #date(2026, 5, 30) then "Eid al-Adha"
+				        else if List.Contains({#date(2025, 9, 27), #date(2026, 9, 26)}, [Date]) then "National Day"
+				        else "Regular week", type text)
+				in
+				    Season
+
+	annotation PBI_ResultType = Table

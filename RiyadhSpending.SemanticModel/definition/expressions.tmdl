@@ -1,0 +1,5 @@
+expression DataFolder = "C:\riyadh-card-spending\data\" meta [IsParameterQuery=true, Type="Text", IsParameterQueryRequired=true]
+	lineageTag: 014fa415-70f2-4de7-a52e-32ee1b0b5e56
+
+	annotation PBI_ResultType = Text
+

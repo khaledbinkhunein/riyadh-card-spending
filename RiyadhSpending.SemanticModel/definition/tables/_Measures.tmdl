@@ -1,0 +1,159 @@
+table _Measures
+	lineageTag: c5d206e7-72d9-47e5-955a-6cb774f9662e
+
+	measure 'City Spend' = SUM ( Cities[ValueSAR] )
+		formatString: #,0
+		lineageTag: 7b42d6e6-820c-4867-9a64-ce4da3bf2369
+
+	measure 'City Transactions' = SUM ( Cities[Transactions] )
+		formatString: #,0
+		lineageTag: 4a90af98-b92b-448a-950b-cb4d3d9e71b4
+
+	measure 'Spend (SAR bn)' = DIVIDE ( [City Spend], 1e9 )
+		formatString: #,0.0
+		lineageTag: e984d08b-2b07-4d50-a00b-12418fc8c37c
+
+	measure 'Blank Text' = " "
+		lineageTag: cadc127b-7a81-4851-8e2f-46e72e650810
+
+	measure 'Avg Ticket (SAR)' = DIVIDE ( [City Spend], [City Transactions] )
+		formatString: #,0.0
+		lineageTag: 9397ddea-f409-4783-b9ff-933a83698c58
+
+	measure 'Kingdom Spend' = CALCULATE ( [City Spend], REMOVEFILTERS ( Cities[City] ) )
+		formatString: #,0
+		lineageTag: 32e51194-078a-438e-a721-7b9d4c42cf9b
+
+	measure 'Share of Kingdom %' = DIVIDE ( [City Spend], [Kingdom Spend] )
+		formatString: 0.0%
+		lineageTag: a1b82984-10fb-464c-b033-232ec74754f6
+
+	measure 'Spend Prev Week' = VAR Wk = MAX ( 'Date'[Date] ) RETURN CALCULATE ( [City Spend], REMOVEFILTERS ( 'Date' ), 'Date'[Date] = Wk - 7 )
+		formatString: #,0
+		lineageTag: 41716e51-e136-4f54-978b-42a93e8ab393
+
+	measure 'Spend WoW %' = DIVIDE ( [City Spend] - [Spend Prev Week], [Spend Prev Week] )
+		formatString: +0.0%;-0.0%;0.0%
+		lineageTag: d855ed8c-edf6-4d8c-8bb8-81834418f678
+
+	measure 'Spend 4-Wk Avg' = VAR Wk = MAX ( 'Date'[Date] ) RETURN CALCULATE ( AVERAGEX ( VALUES ( 'Date'[Date] ), [City Spend] ), REMOVEFILTERS ( 'Date' ), 'Date'[Date] > Wk - 28, 'Date'[Date] <= Wk )
+		formatString: #,0
+		lineageTag: d5e9968c-8e8a-496c-b9c4-8b87ae2ea7a0
+
+	measure 'Avg Weekly Spend' = AVERAGEX ( VALUES ( 'Date'[Date] ), [City Spend] )
+		formatString: #,0
+		lineageTag: 15149caa-5dae-42d1-aece-d39e62cc1101
+
+	measure 'Month-start Uplift %' = VAR MonthStart = CALCULATE ( [Avg Weekly Spend], 'Date'[Week Type] = "Month-start week" ) VAR Other = CALCULATE ( [Avg Weekly Spend], 'Date'[Week Type] = "Other week" ) RETURN DIVIDE ( MonthStart - Other, Other )
+		formatString: +0%;-0%;0%
+		lineageTag: 42dacdef-e339-414e-9c55-19efb2294858
+
+	measure 'Latest Week' = MAX ( 'Date'[Date] )
+		formatString: d mmm yyyy
+		lineageTag: 69124117-abec-4502-a127-9a89f9d702c1
+
+	measure 'Latest Spend' = CALCULATE ( [City Spend], 'Date'[Date] = MAX ( 'Date'[Date] ) )
+		formatString: #,0
+		lineageTag: 4f69b253-11c8-4b85-a1e5-ffd9676e7370
+
+	measure 'Latest WoW %' = CALCULATE ( [Spend WoW %], 'Date'[Date] = MAX ( 'Date'[Date] ) )
+		formatString: +0.0%;-0.0%;0.0%
+		lineageTag: e0d42584-5e05-4ca4-887f-6e4e43fa9cc6
+
+	measure 'Latest Share %' = CALCULATE ( [Share of Kingdom %], 'Date'[Date] = MAX ( 'Date'[Date] ) )
+		formatString: 0.0%
+		lineageTag: bb0abca5-e5d5-4cab-94af-e2a1a3b7d375
+
+	measure 'Latest Avg Ticket' = CALCULATE ( [Avg Ticket (SAR)], 'Date'[Date] = MAX ( 'Date'[Date] ) )
+		formatString: #,0.0
+		lineageTag: f9e59852-eb95-4247-b71b-6e1f98b66da4
+
+	measure 'Riyadh Spend' = CALCULATE ( [City Spend], Cities[City] = "Riyadh" )
+		formatString: #,0
+		lineageTag: db4a2277-a0b0-4c85-9a1d-3e7972d74e35
+
+	measure 'Jeddah Spend' = CALCULATE ( [City Spend], Cities[City] = "Jeddah" )
+		formatString: #,0
+		lineageTag: edb0432f-240d-40c5-8336-a9bbd8612c52
+
+	measure 'Sector Spend' = CALCULATE ( SUM ( Activities[ValueSAR] ), Activities[Level] = "Line" )
+		formatString: #,0
+		lineageTag: b48d88be-859f-43c4-b265-ac8a7a060f7e
+
+	measure 'Sector Share %' = DIVIDE ( [Sector Spend], CALCULATE ( [Sector Spend], REMOVEFILTERS ( Activities[Activity], Activities[Category] ) ) )
+		formatString: 0.0%
+		lineageTag: 222daaf0-434d-4175-bd3d-7e75a64d5aef
+
+	measure 'Sector Axis Max' = 1.15 * MAXX ( ALLSELECTED ( Activities[Category] ), [Sector Spend] )
+		formatString: #,0
+		lineageTag: b877db15-67fc-4275-89d1-72f5205220d6
+
+	measure 'Sector Prev Week' = VAR Wk = MAX ( 'Date'[Date] ) RETURN CALCULATE ( [Sector Spend], REMOVEFILTERS ( 'Date' ), 'Date'[Date] = Wk - 7 )
+		formatString: #,0
+		lineageTag: 9e42a36a-f42a-4766-a585-4ecde931d34f
+
+	measure 'Sector WoW %' = DIVIDE ( [Sector Spend] - [Sector Prev Week], [Sector Prev Week] )
+		formatString: +0.0%;-0.0%;0.0%
+		lineageTag: ca9f6a2a-1b53-4629-a226-a9ecd84146e3
+
+	measure 'Latest Sector WoW %' = CALCULATE ( [Sector WoW %], 'Date'[Date] = MAX ( 'Date'[Date] ) )
+		formatString: +0.0%;-0.0%;0.0%
+		lineageTag: e78982cc-7b16-4fee-bc88-17c9473af67d
+
+	measure 'WoW Colour' = IF ( [Latest Sector WoW %] >= 0, "#5EC4B6", "#B0B5BA" )
+		lineageTag: 863253c9-b34f-4bc2-981e-6b1e428d0234
+
+	measure 'Latest week spend' = "SAR " & FORMAT ( [Latest Spend] / 1e9, "0.00" ) & "bn"
+		lineageTag: b4add730-b149-4141-a08e-d4c87403fae2
+
+	measure 'Week-on-week change' = FORMAT ( [Latest WoW %], "+0.0%;-0.0%;0.0%" )
+		lineageTag: e244b032-a620-47e7-b4a0-462c720186fc
+
+	measure 'Share of Kingdom' = FORMAT ( [Latest Share %], "0.0%" )
+		lineageTag: b09a580e-e243-486a-b4cb-84b8d73e5298
+
+	measure 'Average card payment' = "SAR " & FORMAT ( [Latest Avg Ticket], "0" )
+		lineageTag: 3d932b4b-977f-4525-a4ca-e1744907af3b
+
+	measure 'Month-start week uplift' = FORMAT ( [Month-start Uplift %], "+0%;-0%;0%" )
+		lineageTag: 41a520d0-f87c-4c5d-ab72-fadd6e23d568
+
+	measure 'Headline P1' = "Riyadh spent SAR " & FORMAT ( [Latest Spend] / 1e9, "0.0" ) & "bn on cards in the week to " & FORMAT ( [Latest Week], "d mmm yyyy" ) & ", " & FORMAT ( [Latest Share %], "0%" ) & " of the Kingdom"
+		lineageTag: a3636148-143e-4101-8c66-07643f2de8c3
+
+	measure 'Sub P1' = "Weekly card spending at points of sale in Riyadh. Weeks that include the 1st of the month run " & FORMAT ( [Month-start Uplift %], "0%" ) & " above other weeks."
+		lineageTag: 751f02b0-6788-4d5d-b94f-ccc01a9f92f7
+
+	measure 'Headline P2' = "Riyadh spends " & FORMAT ( DIVIDE ( [Riyadh Spend], [Jeddah Spend] ), "0.0" ) & "x as much as Jeddah, yet its average card payment is smaller (SAR " & FORMAT ( CALCULATE ( [Avg Ticket (SAR)], Cities[City] = "Riyadh" ), "0" ) & " vs " & FORMAT ( CALCULATE ( [Avg Ticket (SAR)], Cities[City] = "Jeddah" ), "0" ) & ")"
+		lineageTag: 3bfb5566-56c1-4675-9774-b817d344fa94
+
+	measure 'Sub P2' = "Riyadh, Jeddah and Dammam, and the ten biggest cities by card spending, for the selected weeks."
+		lineageTag: b30ccb24-5803-4a17-9402-207e26dc08a4
+
+	measure 'Headline P3' = "Groceries, restaurants and clothing take " & FORMAT ( CALCULATE ( [Sector Share %], Activities[Category] IN { "Food & Beverages", "Restaurants & Cafés", "Apparel, Clothing & Accessories" } ), "0%" ) & " of the Kingdom's card spending"
+		lineageTag: f6d1c279-ecb3-47e6-b87f-091e37407cb6
+
+	measure 'Sub P3' = "National figures: SAMA does not split activities by city. Before Eid al-Fitr, weekly clothing spend more than doubled while restaurants fell in Ramadan."
+		lineageTag: 48c3644b-0806-4dc2-aa32-4777b303f3f7
+
+	measure 'Footer' = "Source: SAMA weekly Points of Sale reports · Data to " & FORMAT ( CALCULATE ( MAX ( 'Date'[Date] ), REMOVEFILTERS ( 'Date' ) ), "d mmm yyyy" ) & " · Values in SAR"
+		lineageTag: 328e25ea-1b05-4fc1-be4f-180a5b1b5853
+
+	column Hidden
+		dataType: string
+		isHidden
+		lineageTag: e3105493-5e6c-48f2-84b1-58dc261d339e
+		summarizeBy: none
+		sourceColumn: Hidden
+
+		annotation SummarizationSetBy = Automatic
+
+	partition _Measures = m
+		mode: import
+		source =
+				let
+				    Source = #table(type table [Hidden = text], {})
+				in
+				    Source
+
+	annotation PBI_ResultType = Table

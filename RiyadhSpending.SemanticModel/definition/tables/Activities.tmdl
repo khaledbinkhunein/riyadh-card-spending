@@ -1,0 +1,71 @@
+table Activities
+	lineageTag: dc02f12b-8bbb-4e0c-90b1-febb9afda710
+
+	column Activity
+		dataType: string
+		lineageTag: a776c7bb-e487-4acd-8946-2d40d49ff7c2
+		summarizeBy: none
+		sourceColumn: Activity
+
+		annotation SummarizationSetBy = Automatic
+
+	column Category
+		dataType: string
+		lineageTag: 9546458b-83aa-4e4b-b9a4-bb095c0bd3a9
+		summarizeBy: none
+		sourceColumn: Category
+
+		annotation SummarizationSetBy = Automatic
+
+	column Level
+		dataType: string
+		isHidden
+		lineageTag: 316e6a6a-e851-49a4-8121-8557d6a10674
+		summarizeBy: none
+		sourceColumn: Level
+
+		annotation SummarizationSetBy = Automatic
+
+	column WeekEnding
+		dataType: dateTime
+		formatString: Long Date
+		isHidden
+		lineageTag: 1a07674d-64d0-4936-9c64-9f7026996135
+		summarizeBy: none
+		sourceColumn: WeekEnding
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation UnderlyingDateTimeDataType = Date
+
+	column Transactions
+		dataType: int64
+		formatString: #,0
+		isHidden
+		lineageTag: 0b62ffd2-22c1-49fc-8a43-5a1076a12277
+		summarizeBy: sum
+		sourceColumn: Transactions
+
+		annotation SummarizationSetBy = Automatic
+
+	column ValueSAR
+		dataType: int64
+		formatString: #,0
+		isHidden
+		lineageTag: 5042ae2a-eb0e-43ae-82aa-9837c42f8420
+		summarizeBy: sum
+		sourceColumn: ValueSAR
+
+		annotation SummarizationSetBy = Automatic
+
+	partition Activities = m
+		mode: import
+		source =
+				let
+				    Source = Csv.Document(File.Contents(DataFolder & "activities.csv"), [Delimiter = ",", Columns = 6, Encoding = 65001, QuoteStyle = QuoteStyle.Csv]),
+				    Promoted = Table.PromoteHeaders(Source, [PromoteAllScalars = true]),
+				    Typed = Table.TransformColumnTypes(Promoted, {{"Activity", type text}, {"Category", type text}, {"Level", type text}, {"WeekEnding", type date}, {"Transactions", Int64.Type}, {"ValueSAR", Int64.Type}}, "en-US")
+				in
+				    Typed
+
+	annotation PBI_ResultType = Table

@@ -1,0 +1,11 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/gitIntegration/platformProperties/2.0.0/schema.json",
+  "metadata": {
+    "type": "Report",
+    "displayName": "RiyadhSpending"
+  },
+  "config": {
+    "version": "2.0",
+    "logicalId": "62819e1f-d5dc-4071-ab86-c08f9d97bab7"
+  }
+}
