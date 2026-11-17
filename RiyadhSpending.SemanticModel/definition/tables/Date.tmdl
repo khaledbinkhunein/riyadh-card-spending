@@ -60,7 +60,7 @@ table Date
 		mode: import
 		source =
 				let
-				    Source = Csv.Document(File.Contents(DataFolder & "cities.csv"), [Delimiter = ",", Columns = 4, Encoding = 65001, QuoteStyle = QuoteStyle.Csv]),
+				    Source = Csv.Document(Web.Contents(DataFolder & "cities.csv"), [Delimiter = ",", Columns = 4, Encoding = 65001, QuoteStyle = QuoteStyle.Csv]),
 				    Promoted = Table.PromoteHeaders(Source, [PromoteAllScalars = true]),
 				    Typed = Table.TransformColumnTypes(Promoted, {{"WeekEnding", type date}}, "en-US"),
 				    Weeks = List.Sort(List.Distinct(Typed[WeekEnding])),

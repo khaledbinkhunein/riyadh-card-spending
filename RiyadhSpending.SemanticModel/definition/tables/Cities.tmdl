@@ -45,7 +45,7 @@ table Cities
 		mode: import
 		source =
 				let
-				    Source = Csv.Document(File.Contents(DataFolder & "cities.csv"), [Delimiter = ",", Columns = 4, Encoding = 65001, QuoteStyle = QuoteStyle.Csv]),
+				    Source = Csv.Document(Web.Contents(DataFolder & "cities.csv"), [Delimiter = ",", Columns = 4, Encoding = 65001, QuoteStyle = QuoteStyle.Csv]),
 				    Promoted = Table.PromoteHeaders(Source, [PromoteAllScalars = true]),
 				    Typed = Table.TransformColumnTypes(Promoted, {{"City", type text}, {"WeekEnding", type date}, {"Transactions", Int64.Type}, {"ValueSAR", Int64.Type}}, "en-US")
 				in

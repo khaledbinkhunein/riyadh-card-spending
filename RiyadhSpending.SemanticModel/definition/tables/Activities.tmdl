@@ -62,7 +62,7 @@ table Activities
 		mode: import
 		source =
 				let
-				    Source = Csv.Document(File.Contents(DataFolder & "activities.csv"), [Delimiter = ",", Columns = 6, Encoding = 65001, QuoteStyle = QuoteStyle.Csv]),
+				    Source = Csv.Document(Web.Contents(DataFolder & "activities.csv"), [Delimiter = ",", Columns = 6, Encoding = 65001, QuoteStyle = QuoteStyle.Csv]),
 				    Promoted = Table.PromoteHeaders(Source, [PromoteAllScalars = true]),
 				    Typed = Table.TransformColumnTypes(Promoted, {{"Activity", type text}, {"Category", type text}, {"Level", type text}, {"WeekEnding", type date}, {"Transactions", Int64.Type}, {"ValueSAR", Int64.Type}}, "en-US")
 				in

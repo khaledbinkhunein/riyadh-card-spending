@@ -1,0 +1,2 @@
+# Keep the CSVs byte-for-byte as Python writes them (CRLF) on every OS
+data/*.csv -text

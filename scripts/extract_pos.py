@@ -1,13 +1,17 @@
 """Extract SAMA weekly Points of Sale reports into tidy CSVs.
 
-Usage:  python scripts/extract_pos.py            (from the project folder)
+Usage (from the project folder):
+    python scripts/extract_pos.py                  rebuild data/ from every PDF in reports/
+    python scripts/extract_pos.py --keep-existing  add the PDFs in reports/ on top of the current CSVs
 
-Reads every PDF in reports/ (named POS_YYYY-MM-DD.pdf after the last week it
-covers), pulls Table 1 (activities) and Tables 2.1-2.2 (cities), and writes
+Reads PDFs named POS_YYYY-MM-DD.pdf (after the last week each covers), pulls
+Table 1 (activities) and Tables 2.1-2.2 (cities), and writes
 data/activities.csv and data/cities.csv with one row per name per week.
 Each report repeats the previous four weeks; when weeks overlap, the newest
-report's figures win (SAMA sometimes revises).
+report's figures win (SAMA sometimes revises). Nothing is written unless every
+week passes the checks in scripts/checks.py.
 """
+import argparse
 import csv
 import datetime as dt
 import re
@@ -15,6 +19,9 @@ import sys
 from pathlib import Path
 
 import pdfplumber
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from checks import check  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent.parent
 REPORTS = ROOT / "reports"
@@ -93,39 +100,89 @@ def parse_cities(text, weeks):
     return out
 
 
-def main():
-    pdfs = sorted(REPORTS.glob("POS_*.pdf"), reverse=True)  # newest first
-    if not pdfs:
-        sys.exit(f"No reports found in {REPORTS}")
+ACT_COLS = ["Activity", "Category", "Level", "WeekEnding", "Transactions", "ValueSAR"]
+CITY_COLS = ["City", "WeekEnding", "Transactions", "ValueSAR"]
+
+
+def parse_report(pdf):
+    """Return (weeks, activity rows, city rows) for one SAMA PDF; raise if it looks wrong."""
+    with pdfplumber.open(pdf) as doc:
+        pages = [p.extract_text() or "" for p in doc.pages]
+    weeks = week_endings(pages[0])
+    a = parse_activities(pages[0], weeks)
+    c = parse_cities(pages[1], weeks) + parse_cities(pages[2], weeks)
+    n_act, n_city = len(a) // 4, len(c) // 4
+    print(f"{Path(pdf).name}: weeks {weeks[0]}..{weeks[-1]}, {n_act} activity rows, {n_city} city rows")
+    if n_act != 31 or n_city != 61:
+        raise ValueError(f"{Path(pdf).name}: expected 31 activity rows and 61 city rows")
+    return weeks, a, c
+
+
+def to_dicts(acts, cities):
+    act_rows = []
+    for (name, wk), (_, _, n, v) in sorted(acts.items(), key=lambda kv: (kv[0][1], kv[0][0])):
+        level = "Total" if name == "Total" else "Subtotal" if name in SUBTOTALS else "Line"
+        act_rows.append(dict(zip(ACT_COLS, [name, CATEGORY.get(name, name), level, wk.isoformat(), n, v])))
+    city_rows = [dict(zip(CITY_COLS, [name, wk.isoformat(), n, v]))
+                 for (name, wk), (_, _, n, v) in sorted(cities.items(), key=lambda kv: (kv[0][1], kv[0][0]))]
+    return act_rows, city_rows
+
+
+def read_existing():
+    """The current CSVs as {(name, week): row tuple}, in the same shape the parser yields."""
     acts, cities = {}, {}
-    for pdf in pdfs:
-        with pdfplumber.open(pdf) as doc:
-            pages = [p.extract_text() for p in doc.pages]
-        weeks = week_endings(pages[0])
-        a = parse_activities(pages[0], weeks)
-        c = parse_cities(pages[1], weeks) + parse_cities(pages[2], weeks)
-        n_act, n_city = len(a) // 4, len(c) // 4
-        print(f"{pdf.name}: weeks {weeks[0]}..{weeks[-1]}, {n_act} activity rows, {n_city} city rows")
-        if n_act != 31 or n_city != 61:
-            print(f"  WARNING: expected 31 activity rows and 61 city rows")
+    if (DATA / "activities.csv").exists():
+        for r in csv.DictReader(open(DATA / "activities.csv", encoding="utf-8")):
+            wk = dt.date.fromisoformat(r["WeekEnding"])
+            acts[(r["Activity"], wk)] = (r["Activity"], wk, int(r["Transactions"]), int(r["ValueSAR"]))
+        for r in csv.DictReader(open(DATA / "cities.csv", encoding="utf-8")):
+            wk = dt.date.fromisoformat(r["WeekEnding"])
+            cities[(r["City"], wk)] = (r["City"], wk, int(r["Transactions"]), int(r["ValueSAR"]))
+    return acts, cities
+
+
+def build(pdfs, keep_existing=False):
+    """Combine reports (newest wins) and, optionally, the current CSVs underneath them."""
+    acts, cities = {}, {}
+    for pdf in sorted(pdfs, key=lambda p: Path(p).name, reverse=True):  # newest first
+        _, a, c = parse_report(pdf)
         for r in a:
             acts.setdefault((r[0], r[1]), r)
         for r in c:
             cities.setdefault((r[0], r[1]), r)
+    if keep_existing:
+        old_acts, old_cities = read_existing()
+        for k, r in old_acts.items():
+            acts.setdefault(k, r)
+        for k, r in old_cities.items():
+            cities.setdefault(k, r)
+    return to_dicts(acts, cities)
 
+
+def write(act_rows, city_rows):
     DATA.mkdir(exist_ok=True)
-    with open(DATA / "activities.csv", "w", newline="", encoding="utf-8") as f:
-        w = csv.writer(f)
-        w.writerow(["Activity", "Category", "Level", "WeekEnding", "Transactions", "ValueSAR"])
-        for (name, wk), (_, _, n, v) in sorted(acts.items(), key=lambda kv: (kv[0][1], kv[0][0])):
-            level = "Total" if name == "Total" else "Subtotal" if name in SUBTOTALS else "Line"
-            w.writerow([name, CATEGORY.get(name, name), level, wk.isoformat(), n, v])
-    with open(DATA / "cities.csv", "w", newline="", encoding="utf-8") as f:
-        w = csv.writer(f)
-        w.writerow(["City", "WeekEnding", "Transactions", "ValueSAR"])
-        for (name, wk), (_, _, n, v) in sorted(cities.items(), key=lambda kv: (kv[0][1], kv[0][0])):
-            w.writerow([name, wk.isoformat(), n, v])
-    print(f"Wrote {len(acts)} activity rows and {len(cities)} city rows to {DATA}")
+    for name, cols, rows in (("activities.csv", ACT_COLS, act_rows), ("cities.csv", CITY_COLS, city_rows)):
+        with open(DATA / name, "w", newline="", encoding="utf-8") as f:
+            w = csv.writer(f)
+            w.writerow(cols)
+            w.writerows([r[c] for c in cols] for r in rows)
+    print(f"Wrote {len(act_rows)} activity rows and {len(city_rows)} city rows to {DATA}")
+
+
+def main():
+    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("--keep-existing", action="store_true",
+                    help="keep weeks already in data/ that the PDFs don't cover")
+    args = ap.parse_args()
+    pdfs = sorted(REPORTS.glob("POS_*.pdf"))
+    if not pdfs:
+        sys.exit(f"No reports found in {REPORTS}")
+    act_rows, city_rows = build(pdfs, keep_existing=args.keep_existing)
+    problems = check(act_rows, city_rows)
+    if problems:
+        print("Checks failed; data/ was not changed:", *problems, sep="\n  ")
+        sys.exit(1)
+    write(act_rows, city_rows)
 
 
 if __name__ == "__main__":

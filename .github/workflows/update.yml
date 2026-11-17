@@ -1,0 +1,83 @@
+name: Update SAMA card spending data
+
+on:
+  schedule:
+    # SAMA publishes on Tuesdays. Look Tue-Fri at 06:00 Riyadh (03:00 UTC);
+    # a run that finds nothing new ends quietly without a commit.
+    - cron: "0 3 * * 2-5"
+  workflow_dispatch:
+    inputs:
+      pdf_url:
+        description: "Optional: direct URL(s) of SAMA POS report PDFs, space-separated, instead of reading SAMA's page"
+        type: string
+        default: ""
+  push:
+    branches: [main]
+    paths: ["data/**", "scripts/**", "tests/**"]
+
+permissions:
+  contents: write   # commit the updated CSVs
+  actions: write    # re-enable this workflow if the repo ever goes quiet
+
+concurrency:
+  group: update-data
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: scripts/requirements.txt
+
+      - name: Install dependencies
+        run: pip install -r scripts/requirements.txt
+
+      - name: Run tests (committed data reconciles to SAMA's totals)
+        run: pytest
+
+      # A push (for example new CSVs from a local run) only needs the tests above.
+      - name: Fetch new SAMA reports, extract and check
+        if: github.event_name != 'push'
+        env:
+          PDF_URL: ${{ inputs.pdf_url }}
+        run: |
+          if [ -n "$PDF_URL" ]; then
+            python scripts/update.py --pdf $PDF_URL
+          else
+            python scripts/update.py --stale-after 21
+          fi
+
+      - name: Commit the data if it changed
+        if: github.event_name != 'push'
+        run: |
+          git add data/
+          if git diff --cached --quiet; then
+            echo "No data changes to commit."
+          else
+            git config user.name "khaledbinkhunein"
+            git config user.email "343924651+khaledbinkhunein@users.noreply.github.com"
+            git commit -m "Data through week ending $(tail -n 1 data/cities.csv | cut -d, -f2)"
+            git push
+          fi
+
+      # GitHub pauses scheduled workflows after 60 days without repository activity.
+      # The weekly data commit normally keeps the repo active; if there has been no
+      # commit for 45 days, re-enable the workflow, which resets that timer.
+      - name: Keep the schedule from being paused
+        if: github.event_name == 'schedule'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          days=$(( ( $(date +%s) - $(git log -1 --format=%ct) ) / 86400 ))
+          echo "Last commit was $days day(s) ago."
+          if [ "$days" -ge 45 ]; then
+            gh api -X PUT "repos/${{ github.repository }}/actions/workflows/update.yml/enable"
+            echo "Re-enabled the workflow to reset the 60-day inactivity timer."
+          fi
