@@ -12,25 +12,39 @@ Set-Location $repo
 $log = Join-Path $repo "reports\last-run.log"
 Start-Transcript -Path $log -Force | Out-Null
 try {
-    git pull --ff-only
+    # Only data/ is ever changed here, so rebasing onto GitHub's copy is safe
+    # (for example if GitHub Actions committed data itself).
+    git pull --rebase --autostash
     if ($LASTEXITCODE -ne 0) { throw "git pull failed" }
 
     $py = Join-Path $repo ".venv\Scripts\python.exe"
     if (-not (Test-Path $py)) {
         python -m venv .venv
-        & $py -m pip install --quiet -r scripts\requirements.txt
+        if ($LASTEXITCODE -ne 0) { throw "could not create .venv" }
     }
+    # Every run, so a half-finished install or a changed requirements.txt is fixed
+    & $py -m pip install --quiet -r scripts\requirements.txt
+    if ($LASTEXITCODE -ne 0) { throw "pip install failed" }
 
     & $py scripts\update.py
     if ($LASTEXITCODE -ne 0) { throw "update.py failed (exit $LASTEXITCODE)" }
 
     git add data/
-    git diff --cached --quiet
+    git diff --cached --quiet -- data/
     if ($LASTEXITCODE -eq 0) {
         Write-Output "No data changes to commit."
     } else {
         $last = (Get-Content data\cities.csv -Tail 1).Split(",")[1]
-        git -c user.name="khaledbinkhunein" -c user.email="343924651+khaledbinkhunein@users.noreply.github.com" commit -m "Data through week ending $last"
+        # Commit only data/, even if something else happens to be staged
+        git -c user.name="khaledbinkhunein" -c user.email="343924651+khaledbinkhunein@users.noreply.github.com" commit -m "Data through week ending $last" -- data/
+        if ($LASTEXITCODE -ne 0) { throw "git commit failed" }
+    }
+
+    # Push whenever this PC has commits GitHub lacks, including one left over
+    # from an earlier run whose push failed.
+    $ahead = git rev-list --count "@{u}..HEAD"
+    if ($LASTEXITCODE -ne 0) { throw "could not compare with GitHub" }
+    if ([int]$ahead -gt 0) {
         git push
         if ($LASTEXITCODE -ne 0) { throw "git push failed" }
     }

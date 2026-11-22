@@ -70,12 +70,15 @@ table Date
 				    WeekLabel = Table.AddColumn(MonthSort, "Week Label", each "w/e " & Date.ToText([Date], "d MMM yy", "en-US"), type text),
 				    // A Sun-Sat week contains the 1st of the month when it ends on day 1-7
 				    WeekType = Table.AddColumn(WeekLabel, "Week Type", each if Date.Day([Date]) <= 7 then "Month-start week" else "Other week", type text),
-				    // Week-ending Saturdays; Islamic holidays per the Umm al-Qura calendar (Ramadan 1447 began 18 Feb 2026)
+				    // Week-ending Saturdays; Islamic holidays per the Umm al-Qura calendar (Ramadan 1447 began 18 Feb 2026).
+				    // 2027 (1448 AH) uses the predicted dates: Ramadan from about 8 Feb, Eid al-Fitr about 9-10 Mar,
+				    // Eid al-Adha about 16 May. A shift of a day either way stays in the same week. Check once announced.
 				    Season = Table.AddColumn(WeekType, "Season", each
 				        if [Date] >= #date(2026, 2, 21) and [Date] <= #date(2026, 3, 14) then "Ramadan"
-				        else if [Date] = #date(2026, 3, 21) then "Eid al-Fitr"
-				        else if [Date] = #date(2026, 5, 30) then "Eid al-Adha"
-				        else if List.Contains({#date(2025, 9, 27), #date(2026, 9, 26)}, [Date]) then "National Day"
+				        else if [Date] >= #date(2027, 2, 13) and [Date] <= #date(2027, 3, 6) then "Ramadan"
+				        else if List.Contains({#date(2026, 3, 21), #date(2027, 3, 13)}, [Date]) then "Eid al-Fitr"
+				        else if List.Contains({#date(2026, 5, 30), #date(2027, 5, 22)}, [Date]) then "Eid al-Adha"
+				        else if List.Contains({#date(2025, 9, 27), #date(2026, 9, 26), #date(2027, 9, 25)}, [Date]) then "National Day"
 				        else "Regular week", type text)
 				in
 				    Season

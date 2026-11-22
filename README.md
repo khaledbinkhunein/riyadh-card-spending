@@ -35,7 +35,7 @@ SAMA weekly PDF ──► scripts/update.py ──► data/activities.csv, data/
 ```
 
 1. **Extract** (`scripts/extract_pos.py`, Python + pdfplumber). The script reads the text layer of each report and pulls out the activity and city rows. It converts figures from thousands to SAR and writes one row per name per week. Reports overlap by up to three weeks, and when they do, the newest report wins because SAMA sometimes revises figures. It also flags the three activity subtotals (Transportation, Health, Recreation & Culture) so they are never counted twice.
-2. **Check** (`scripts/checks.py`, run by `pytest` and before any CSV is written). For every week, the activity lines add up to SAMA's printed total, and the 61 cities add up to the same total, within SAR 6k on totals of about SAR 13bn (rounding in the source). Each subtotal matches its sub-rows to within SAR 1k. The checks also fail on a missing week, a city or activity that appears or disappears, or a week-on-week swing beyond −50%/+100% (a sign the PDF was misread). If any check fails, the CSVs are left as they were.
+2. **Check** (`scripts/checks.py`, run by `pytest` and before any CSV is written). For every week, the activity lines add up to SAMA's printed total, and the 61 cities add up to the same total, and each subtotal matches its sub-rows. Because SAMA rounds every figure to the nearest thousand, the allowed gap grows with the number of figures added: from SAR 1.5k for a two-part subtotal to about SAR 11k for the 61 cities, on totals of about SAR 13bn. A misread figure is normally off by far more. The checks also fail on a missing week, a city or activity that appears or disappears, or a week-on-week swing beyond −50%/+100% (a sign the PDF was misread). If any check fails, the CSVs are left as they were.
 3. **Model** (Power BI project, `.pbip`, with the semantic model in TMDL). It has two fact tables (`Cities`, `Activities`) and a weekly `Date` table built in Power Query. The Date table labels month-start weeks and the Ramadan, Eid al-Fitr, Eid al-Adha and National Day weeks, using the Umm al-Qura calendar. Both relationships are one-to-many with single-direction filtering.
 4. **Measures.** 38 DAX measures live in a `_Measures` table, including:
    - spend, transactions and average payment
@@ -49,7 +49,7 @@ SAMA weekly PDF ──► scripts/update.py ──► data/activities.csv, data/
 - **Card payments at points of sale only.** Cash, bank transfers and most online purchases are not included, so this is not total consumer spending.
 - **Nominal SAR, not adjusted for inflation.** Changes over the period include price changes.
 - **Updated weekly, with a lag.** SAMA publishes every Tuesday; each week ends on a Saturday. The footer shows the latest week in the data.
-- **Holiday labels are typed in.** The Date table marks Ramadan, both Eids and National Day for 2025–26 only. Later holidays show as regular weeks until their dates are added in `Date.tmdl`.
+- **Holiday labels are typed in.** The Date table marks Ramadan, both Eids and National Day from 2025 to 2027 (the 2027 Islamic dates are the predicted Umm al-Qura dates). Later holidays show as regular weeks until their dates are added in `Date.tmdl`.
 - **Activities are national.** The reports do not break activities down by city, so page 3 cannot be filtered to Riyadh.
 - **Weekly granularity.** The weeks run Sunday to Saturday, so effects within a week, such as the exact payday, cannot be seen. Holiday labels mark the week-ending Saturday that contains the holiday.
 - **Correlation, not causation.** The payday finding is a pattern in the timing, not a measured effect of salaries.
@@ -77,8 +77,6 @@ pytest                                         # the checks, on the committed da
 
   ```
   schtasks /Create /TN "Riyadh card spending update" /SC WEEKLY /D WED /ST 20:00 /TR "powershell -NoProfile -ExecutionPolicy Bypass -File \"C:\path\to\riyadh-card-spending\scripts\run_weekly.ps1\""
-iyadh-card-spending\scripts
-un_weekly.ps1\""
   ```
 
   The PC must be on and off any VPN at that time. The log of the last run is `reports/last-run.log`.

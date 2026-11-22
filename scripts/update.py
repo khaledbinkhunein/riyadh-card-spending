@@ -80,7 +80,8 @@ def last_week_in_data():
     path = ex.DATA / "cities.csv"
     if not path.exists():
         return None
-    return max(dt.date.fromisoformat(r["WeekEnding"]) for r in csv.DictReader(open(path, encoding="utf-8")))
+    with open(path, encoding="utf-8") as f:
+        return max((dt.date.fromisoformat(r["WeekEnding"]) for r in csv.DictReader(f)), default=None)
 
 
 def report_weeks(pdf_bytes):
@@ -119,7 +120,8 @@ def find_new_reports(after):
         raise SamaUnreachable("SAMA's POS page could not be reached (sama.gov.sa only answers Saudi connections)")
     links = pdf_links(html, base)
     print(f"{len(links)} PDF link(s) on {base}")
-    new, seen, downloads = {}, [], 0
+    new, downloads = {}, 0
+    first_end, order_known = None, False
     while links and downloads < MAX_DOWNLOADS:
         url = links.pop(0)
         downloads += 1
@@ -131,16 +133,53 @@ def find_new_reports(after):
         weeks = report_weeks(data)
         if not weeks:
             continue  # some other PDF on the page
-        seen.append(weeks[-1])
         if after is None or weeks[-1] > after:
             new.setdefault(weeks[-1], (data, weeks))
-        if len(seen) == 2 and seen[1] > seen[0]:
-            links.reverse()  # the page lists oldest first: continue from the newest end
+        if after is None:
+            continue  # no data yet: keep every report, up to the download limit
+        # Work out the page's order from the first two reports with different dates
+        if first_end is None:
+            first_end = weeks[-1]
             continue
-        covered = new and min(w[0] for _, w in new.values()) <= after + dt.timedelta(days=7)
-        if len(seen) >= 2 and weeks[-1] <= after and (covered or not new):
-            break  # reached reports we already have
+        if not order_known:
+            if weeks[-1] == first_end:
+                continue  # the same report linked twice; the order is still unknown
+            order_known = True
+            if weeks[-1] > first_end:
+                links.reverse()  # the page lists oldest first: continue from the newest end
+                continue
+        if weeks[-1] <= after:
+            break  # going newest first, so every report from here on is one we have
+    if new and after is not None:
+        starts = min(w[0] for _, w in new.values())
+        if starts > after + dt.timedelta(days=7):
+            print(f"Warning: the new reports start at week ending {starts}, but data/ ends at {after}.\n"
+                  "The weeks in between are not on SAMA's page any more. Download the missing report(s)\n"
+                  "by hand and add them with: python scripts/update.py --pdf FILE [...]")
     return [save(d, w) for d, w in new.values()]
+
+
+def report_revisions(act_rows, city_rows, threshold=0.01):
+    """List figures for weeks already in data/ that the new reports change by more than 1%.
+
+    The newest report wins on overlapping weeks, because SAMA sometimes revises its
+    figures. This makes such changes visible in the log instead of silent.
+    """
+    old_acts, old_cities = ex.read_existing()
+    changed = []
+    for rows, old, name_col in ((act_rows, old_acts, "Activity"), (city_rows, old_cities, "City")):
+        for r in rows:
+            prev = old.get((r[name_col], dt.date.fromisoformat(r["WeekEnding"])))
+            if not prev:
+                continue
+            for field, before in (("Transactions", prev[2]), ("ValueSAR", prev[3])):
+                now = int(r[field])
+                if before and abs(now / before - 1) > threshold:
+                    changed.append(f"{r['WeekEnding']} {r[name_col]} {field}: {before:,} -> {now:,} ({now / before - 1:+.1%})")
+    if changed:
+        print(f"SAMA revised {len(changed)} figure(s) in weeks already in data/ by more than {threshold:.0%}:",
+              *changed, sep="\n  ")
+    return changed
 
 
 def main():
@@ -176,6 +215,7 @@ def main():
         return
 
     act_rows, city_rows = ex.build(paths, keep_existing=True)
+    report_revisions(act_rows, city_rows)
     problems = check(act_rows, city_rows)
     if problems:
         print("Checks failed; data/ was not changed:", *problems, sep="\n  ")

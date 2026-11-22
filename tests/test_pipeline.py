@@ -13,7 +13,8 @@ import update  # noqa: E402
 
 
 def load(name):
-    return list(csv.DictReader(open(ROOT / "data" / name, encoding="utf-8")))
+    with open(ROOT / "data" / name, encoding="utf-8") as f:
+        return list(csv.DictReader(f))
 
 
 @pytest.fixture(scope="module")
@@ -27,7 +28,7 @@ def test_committed_data_passes_every_check(data):
     assert checks.check(*data) == []
 
 
-def test_data_starts_on_first_week_and_is_recent(data):
+def test_data_starts_on_first_week_and_has_every_week_since(data):
     weeks = sorted({r["WeekEnding"] for r in data[1]})
     assert weeks[0] == "2025-09-20"
     assert len(weeks) >= 56
@@ -48,9 +49,19 @@ def test_missing_week_is_caught(data):
 def test_total_mismatch_is_caught(data):
     acts = copy.deepcopy(data[0])
     row = next(r for r in acts if r["Activity"] == "Hotels" and r["WeekEnding"] == "2026-03-14")
-    row["ValueSAR"] = str(int(row["ValueSAR"]) + 7_000)
+    row["ValueSAR"] = str(int(row["ValueSAR"]) + 50_000)  # one misread digit
     problems = checks.check(acts, data[1])
     assert any("2026-03-14: activity ValueSAR" in p for p in problems)
+
+
+def test_rounding_limits_fit_the_number_of_parts():
+    # Small sums: the true worst case (500 per figure, the total included)
+    assert checks.rounding_tolerance(2) == 1_500
+    assert checks.rounding_tolerance(3) == 2_000
+    # Long sums: well above what rounding has produced so far (6,000 for 61 cities),
+    # well below what a misread figure would cause
+    assert 9_000 < checks.rounding_tolerance(61) < 15_000
+    assert 6_000 < checks.rounding_tolerance(27) < 10_000
 
 
 def test_missing_city_is_caught(data):

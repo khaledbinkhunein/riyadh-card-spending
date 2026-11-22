@@ -4,16 +4,30 @@ check(activities, cities) returns a list of problems (empty when the data is
 good). Both arguments are lists of dicts with the same columns as the CSVs.
 """
 import datetime as dt
+import math
 from collections import defaultdict
 
-# SAMA prints figures in SAR thousands, so sums drift by rounding.
-TOTAL_TOLERANCE = 6_000      # activity lines, and the 61 cities, vs the printed total
-SUBTOTAL_TOLERANCE = {"ValueSAR": 1_000, "Transactions": 2_000}
 ACTIVITY_ROWS = 31           # 27 lines + 3 subtotals + Total
 CITY_ROWS = 61               # including "Others"
 # A week-on-week swing outside this range almost certainly means a parsing error
 # (the first 56 weeks ranged from -18% to +38%, Eid weeks included).
 MAX_DROP, MAX_RISE = -0.50, 1.00
+
+
+def rounding_tolerance(n_parts):
+    """The largest gap that rounding alone can plausibly cause when n_parts figures
+    are added up and compared with a printed total.
+
+    SAMA prints every figure rounded to the nearest thousand, so each one (the
+    total included) is off by up to 500. The gap can never exceed 500 per figure;
+    for long sums, such a worst case is practically impossible, so the limit is
+    five times the typical spread of the gap instead (a chance of under one in a
+    million per check). A misread number is normally off by far more than this.
+    """
+    figures = n_parts + 1
+    worst_case = 500 * figures
+    five_spreads = 5 * (1000 / math.sqrt(12)) * math.sqrt(figures)
+    return min(worst_case, five_spreads)
 
 
 def _by_week(rows):
@@ -56,15 +70,17 @@ def check(activities, cities):
             t = int(total[field])
             if t <= 0:
                 problems.append(f"{week}: {field} total is not positive")
-            lines = sum(int(r[field]) for r in a if r["Level"] == "Line")
-            if abs(lines - t) > TOTAL_TOLERANCE:
+            line_rows = [r for r in a if r["Level"] == "Line"]
+            lines = sum(int(r[field]) for r in line_rows)
+            if abs(lines - t) > rounding_tolerance(len(line_rows)):
                 problems.append(f"{week}: activity {field} sums to {lines:,}, SAMA total is {t:,}")
             city_sum = sum(int(r[field]) for r in c)
-            if c and abs(city_sum - t) > TOTAL_TOLERANCE:
+            if c and abs(city_sum - t) > rounding_tolerance(len(c)):
                 problems.append(f"{week}: city {field} sums to {city_sum:,}, SAMA total is {t:,}")
             for sub in (r for r in a if r["Level"] == "Subtotal"):
-                parts = sum(int(r[field]) for r in a if r["Level"] == "Line" and r["Category"] == sub["Activity"])
-                if abs(parts - int(sub[field])) > SUBTOTAL_TOLERANCE[field]:
+                part_rows = [r for r in line_rows if r["Category"] == sub["Activity"]]
+                parts = sum(int(r[field]) for r in part_rows)
+                if abs(parts - int(sub[field])) > rounding_tolerance(len(part_rows)):
                     problems.append(f"{week}: {sub['Activity']} {field} parts sum to {parts:,}, subtotal is {int(sub[field]):,}")
         if any(int(r[f]) < 0 for r in a + c for f in ("ValueSAR", "Transactions")):
             problems.append(f"{week}: negative figures")

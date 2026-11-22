@@ -127,7 +127,7 @@ table _Measures
 	measure 'Headline P2' = "Riyadh spends " & FORMAT ( DIVIDE ( [Riyadh Spend], [Jeddah Spend] ), "0.0" ) & "x as much as Jeddah, yet its average card payment is smaller (SAR " & FORMAT ( CALCULATE ( [Avg Ticket (SAR)], Cities[City] = "Riyadh" ), "0" ) & " vs " & FORMAT ( CALCULATE ( [Avg Ticket (SAR)], Cities[City] = "Jeddah" ), "0" ) & ")"
 		lineageTag: 3bfb5566-56c1-4675-9774-b817d344fa94
 
-	measure 'Sub P2' = "Riyadh, Jeddah and Dammam, and the ten biggest cities by card spending, for the selected weeks."
+	measure 'Sub P2' = "Riyadh, Jeddah and Dammam, and ten of the biggest cities by card spending, for the selected weeks."
 		lineageTag: b30ccb24-5803-4a17-9402-207e26dc08a4
 
 	measure 'Headline P3' = "Groceries, restaurants and clothing take " & FORMAT ( CALCULATE ( [Sector Share %], Activities[Category] IN { "Food & Beverages", "Restaurants & Cafés", "Apparel, Clothing & Accessories" } ), "0%" ) & " of the Kingdom's card spending"

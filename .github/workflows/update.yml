@@ -49,7 +49,8 @@ jobs:
           PDF_URL: ${{ inputs.pdf_url }}
         run: |
           if [ -n "$PDF_URL" ]; then
-            python scripts/update.py --pdf $PDF_URL
+            read -ra urls <<< "$PDF_URL"   # split on spaces only, no wildcard expansion
+            python scripts/update.py --pdf "${urls[@]}"
           else
             python scripts/update.py --stale-after 21
           fi

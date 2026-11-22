@@ -33,6 +33,8 @@ ACT_ROW = re.compile(rf"^((?:{NUM} ){{7}}{NUM}) ({PCT}) ({PCT})$")
 CITY_ROW = re.compile(rf"^(.*?)\s*((?:{NUM} ){{7}}{NUM}) ({PCT}) ({PCT})$")
 WEEK = re.compile(r"(\d{1,2}) ([A-Za-z]{3}),(\d{2})")
 ASCII_NAME = re.compile(r"^[A-Za-z][A-Za-z'\-\. &]*")
+MONTHS = {m: i for i, m in enumerate(
+    ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"], start=1)}
 
 # Rows on page 1 that are subtotals of the rows beneath them, or the grand total.
 SUBTOTALS = {"Transportation", "Health", "Recreation & Culture"}
@@ -59,7 +61,9 @@ def week_endings(text):
     """The four week-ending dates in the table header, oldest first."""
     header = next(l for l in text.splitlines() if len(WEEK.findall(l)) == 8)
     ends = WEEK.findall(header)[1::2]
-    return [dt.datetime.strptime(" ".join(e), "%d %b %y").date() for e in ends]
+    # Month names looked up here rather than with strptime("%b"), which follows the
+    # computer's language setting and fails on a PC set to Arabic
+    return [dt.date(2000 + int(yy), MONTHS[mon.title()], int(day)) for day, mon, yy in ends]
 
 
 def rows_from_numbers(name, nums, weeks):
@@ -132,12 +136,14 @@ def read_existing():
     """The current CSVs as {(name, week): row tuple}, in the same shape the parser yields."""
     acts, cities = {}, {}
     if (DATA / "activities.csv").exists():
-        for r in csv.DictReader(open(DATA / "activities.csv", encoding="utf-8")):
-            wk = dt.date.fromisoformat(r["WeekEnding"])
-            acts[(r["Activity"], wk)] = (r["Activity"], wk, int(r["Transactions"]), int(r["ValueSAR"]))
-        for r in csv.DictReader(open(DATA / "cities.csv", encoding="utf-8")):
-            wk = dt.date.fromisoformat(r["WeekEnding"])
-            cities[(r["City"], wk)] = (r["City"], wk, int(r["Transactions"]), int(r["ValueSAR"]))
+        with open(DATA / "activities.csv", encoding="utf-8") as f:
+            for r in csv.DictReader(f):
+                wk = dt.date.fromisoformat(r["WeekEnding"])
+                acts[(r["Activity"], wk)] = (r["Activity"], wk, int(r["Transactions"]), int(r["ValueSAR"]))
+        with open(DATA / "cities.csv", encoding="utf-8") as f:
+            for r in csv.DictReader(f):
+                wk = dt.date.fromisoformat(r["WeekEnding"])
+                cities[(r["City"], wk)] = (r["City"], wk, int(r["Transactions"]), int(r["ValueSAR"]))
     return acts, cities
 
 
